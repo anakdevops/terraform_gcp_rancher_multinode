@@ -1,0 +1,201 @@
+---
+- name: Install rancher dengan user serverdevops
+  hosts: localhost
+  connection: local
+  remote_user: root
+  vars:
+    VERSION_STRING: "5:24.0.0-1~ubuntu.22.04~jammy"
+    kernel_modules:
+      - br_netfilter
+      - ip6_udp_tunnel
+      - ip_set
+      - ip_set_hash_ip
+      - ip_set_hash_net
+      - iptable_filter
+      - iptable_nat
+      - iptable_mangle
+      - iptable_raw
+      - nf_conntrack_netlink
+      - nf_conntrack
+      - nf_conntrack_ipv4
+      - nf_defrag_ipv4
+      - nf_nat
+      - nf_nat_ipv4
+      - nf_nat_masquerade_ipv4
+      - nfnetlink
+      - udp_tunnel
+      - veth
+      - vxlan
+      - x_tables
+      - xt_addrtype
+      - xt_conntrack
+      - xt_comment
+      - xt_mark
+      - xt_multiport
+      - xt_nat
+      - xt_recent
+      - xt_set
+      - xt_statistic
+      - xt_tcpudp
+  tasks:
+    - name: install kubectl
+      shell: |
+        curl -LO https://storage.googleapis.com/kubernetes-release/release/`curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt`/bin/linux/amd64/kubectl
+        chmod +x ./kubectl
+        sudo mv ./kubectl /usr/local/bin/kubectl
+        kubectl version --client
+    - name: install rke
+      shell: |
+        curl -s https://api.github.com/repos/rancher/rke/releases/latest | grep download_url | grep amd64 | cut -d '"' -f 4 | wget -qi -
+        chmod +x rke_linux-amd64
+        sudo mv rke_linux-amd64 /usr/local/bin/rke
+        rke --version
+    - name: install helm
+      shell: |
+        curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+        chmod 700 get_helm.sh
+        ./get_helm.sh
+        helm version
+    
+    - name: Install required packages
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - gnupg
+        - lsb-release
+        - git
+        - wget
+
+    - name: Add RKE admin user
+      user:
+        name: serverdevops
+        shell: /bin/bash
+     
+    - name: Create sudo file
+      file:
+        path: /etc/sudoers.d/serverdevops
+        state: touch
+    
+    - name: Give rke user passwordless sudo
+      lineinfile:
+        path: /etc/sudoers.d/serverdevops
+        state: present
+        line: 'serverdevops ALL=(ALL:ALL) NOPASSWD: ALL'
+    
+    - name: Create a 2048-bit SSH key for user jsmith in ~serverdevops/.ssh/id_rsa
+      ansible.builtin.user:
+        name: serverdevops
+        generate_ssh_key: yes
+        ssh_key_bits: 2048
+        ssh_key_file: .ssh/id_rsa
+
+    - name: Fix owner of the generated pub key
+      file:
+        path: /home/serverdevops/.ssh/id_rsa.pub
+        owner: serverdevops
+        group: serverdevops
+
+    - name: Copy SSH key to authorized_keys
+      authorized_key:
+        user: serverdevops
+        key: "{{ lookup('file', '/home/serverdevops/.ssh/id_rsa.pub') }}"
+        state: present
+  
+    - name: Load kernel modules for RKE
+      modprobe:
+        name: "{{ item }}"
+        state: present
+      with_items: "{{ kernel_modules }}"
+      ignore_errors: true
+
+    - name: Disable SWAP since kubernetes can't work with swap enabled (1/2)
+      shell: |
+        swapoff -a
+     
+    - name: Disable SWAP in fstab since kubernetes can't work with swap enabled (2/2)
+      replace:
+        path: /etc/fstab
+        regexp: '^([^#].*?\sswap\s+.*)$'
+        replace: '# \1'
+    - name: Modify sysctl entries
+      shell: |
+        cat >>/etc/sysctl.d/kubernetes.conf<<EOF
+        net.bridge.bridge-nf-call-ip6tables = 1
+        net.bridge.bridge-nf-call-iptables = 1
+        EOF
+        sysctl --system
+    
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker APT repository
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+        state: present
+
+    - name: Install Docker with specific version
+      shell: apt install docker-ce={{ VERSION_STRING }} docker-ce-cli={{ VERSION_STRING }} containerd.io docker-buildx-plugin docker-compose-plugin -y
+
+    - name: Start Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: add user Docker
+      shell: |
+        sudo usermod -aG docker serverdevops
+        id serverdevops
+        sudo systemctl start docker
+    
+    - name: Install docker-compose
+      remote_user: ubuntu
+      get_url: 
+        url : https://github.com/docker/compose/releases/download/v2.23.0/docker-compose-linux-x86_64
+        dest: /usr/local/bin/docker-compose
+        mode: 'u+x,g+x'
+
+    - name: Configure SSHd
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^AllowTcpForwarding'
+        line: 'AllowTcpForwarding yes'
+      
+
+    - name: Create cluster.yml
+      blockinfile:
+        path: /home/serverdevops/cluster.yml
+        create: yes
+        block: |
+          nodes:
+            - address: 10.0.0.2
+              user: serverdevops
+              role:
+                - controlplane
+                - etcd
+                - worker
+            - address: 10.0.0.3
+              user: serverdevops
+              role:
+                - controlplane
+                - etcd
+                - worker
+          network:
+              plugin: canal
+              options:
+                canal_flannel_backend_type: vxlan
+    - name: Set owner and group for cluster.yml
+      file:
+        path: /home/serverdevops/cluster.yml
+        owner: serverdevops
+        group: serverdevops
+        mode: '0644'
+    
+    - name: disable UFW
+      command: ufw disable
