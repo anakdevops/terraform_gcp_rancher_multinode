@@ -1,7 +1,7 @@
 provider "google" {
   project     = "adysur"
   region      = "us-central1"
-  credentials = "./adysur-89e7e934541b2fd.json"
+  credentials = "./adysur-89e7e941b2fd.json"
 }
 
 # Generate SSH Key Pair
@@ -100,6 +100,7 @@ resource "google_compute_instance" "vm_instance" {
   boot_disk {
     initialize_params {
       image = "ubuntu-os-cloud/ubuntu-2204-jammy-v20230615"
+      size  = 50  # Set boot disk size to 50GB
     }
   }
 
