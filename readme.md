@@ -11,26 +11,28 @@ sudo su
 git clone https://github.com/anakdevops/terraform_gcp_rancher_multinode.git
 cd terraform_gcp_rancher_multinode
 ansible-playbook install.yaml
-su serverdevops
-cd /home/serverdevops/
-sesuaikan cluster.yml
+cat /home/serverdevops/cluster.yml
 ```
 
 ```
 sudo nano /etc/ssh/sshd_config
 PubkeyAuthentication yes
-AuthorizedKeysFile %h/.ssh/authorized_keys
+AuthorizedKeysFile      .ssh/authorized_keys .ssh/authorized_keys2
 AllowTcpForwarding yes
 sudo systemctl restart sshd
 ```
 
 ```
+su serverdevops
 cat /home/serverdevops/.ssh/id_rsa.pub
-echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDvteCe3dkEPnTTs6SqxtoTmDcz4fRVkL4xwwRo18IYV8eA8Pnh5FfBXi2Vefst+ZIyHHpmXalkHQ1W1kB5US8FAyKq1ubzimNp55YrxekZaMHZI/IU4Fnk3sg/Gn4j+CJnXg4i6NuVU9IrsEPSRcPcn1G00gt8xKonic/Kx8C6iaGwq9rh+2XrL1rb5gu/i0M3GGSTmVyjTMWdUkNMJ8BTIHm7j8aZu1ZQi6O2G+cp8QrZx975bp8qoJ24SswLl/LDqWyDR4yfQM1m3gkNsCqhghF7q6WqUdk4rBFUoKJ+gTphmzM876YMuFdEZEQu+gsevzXc3VMIRxVZhbUAEL/1KsUKvfLqNdbp87/sLg+rB1zAr6nkCKJS6IvKfyciCSNp6jXP2u6arLVv9A82I4nG2GQ/dqRiWB+1pDgvvOeQwC4DO7PnXzRGLXyqaOK5kTwzo+aDNknzygA5aMRqA2Psf77zbio5PEWDBqytrUT0YOd0+6eEdNnUrfRziIyQpYCaDcJjWRiT0T+2YKUCE0eqDqWHNVcn/Zr5Y5QdytVHgPXT/5DnbZOwvr8baggpGpgrIY+2iOVxBjeA8M3DiNiDS/wkstHpuW9BXbUYF1ug9/WWiX74Q6au96Jj4nP4QnfYuDejosxbx2ZAHOCT9trv+bvfgk52a2bQuxL8p05Gvw== serverdevops@rancher-node-1" >> ~/.ssh/authorized_keys
+echo "{{COPY SSH KEY}}" >> ~/.ssh/authorized_keys
 ssh serverdevops@10.0.0.3
 ```
 
 ```
+su serverdevops
+cd /home/serverdevops/
+cat /home/serverdevops/cluster.yml
 rke up --config cluster.yml
 INFO[0176] Finished building Kubernetes cluster successfully
 export KUBECONFIG=$HOME/kube_config_cluster.yml
