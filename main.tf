@@ -55,6 +55,19 @@ resource "google_compute_firewall" "http" {
   source_ranges = ["0.0.0.0/0"]
 }
 
+# Create a Firewall Rule to Allow HTTPS (Port 443)
+resource "google_compute_firewall" "https" {
+  name    = "allow-https"
+  network = google_compute_network.vpc_network.name
+
+  allow {
+    protocol = "tcp"
+    ports    = ["443"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+}
+
 # Create a Firewall Rule to Allow Kubernetes API Server (Port 6443)
 resource "google_compute_firewall" "k8s-api" {
   name    = "allow-k8s-api"
