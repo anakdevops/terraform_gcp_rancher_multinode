@@ -7,6 +7,7 @@ terraform apply -auto-approve
 ```
 ssh -i terraform-key.pem terraform@34.42.195.47
 ssh -i terraform-key.pem terraform@35.193.43.170
+sudo su
 git clone https://github.com/anakdevops/terraform_gcp_rancher_multinode.git
 cd terraform_gcp_rancher_multinode
 ansible-playbook install.yaml
