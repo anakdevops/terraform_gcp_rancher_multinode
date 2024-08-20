@@ -7,11 +7,12 @@ terraform apply -auto-approve
 ```
 ssh -i terraform-key.pem terraform@34.42.195.47
 ssh -i terraform-key.pem terraform@35.193.43.170
-git clone https://github.com/anakdevops/rancher-single-node.git
-cd rancher-single-node
+git clone https://github.com/anakdevops/terraform_gcp_rancher_multinode.git
+cd terraform_gcp_rancher_multinode
 ansible-playbook install.yaml
 su serverdevops
 cd /home/serverdevops/
+sesuaikan cluster.yml
 ```
 
 ```
